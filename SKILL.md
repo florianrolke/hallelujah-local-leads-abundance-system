@@ -10,6 +10,7 @@ Tell Claude a city name and an industry. It will:
 3. Scrape BNI chapters for high-intent business networkers
 4. Scrape City Lifestyle magazine issues for advertisers already spending on marketing
 5. Enrich every lead with LinkedIn, email, business context, and ICP tier scoring
+6. Generate a luxury website redesign as a lead magnet — deployed to a live preview URL
 
 Every gotcha from 3 months of production is baked in: LinkedIn pollution filtering, Cloudflare workarounds, referral URL decoding, Issuu chrome removal, BNI portal pagination across 11 regional sites.
 
@@ -22,15 +23,14 @@ Every gotcha from 3 months of production is baked in: LinkedIn pollution filteri
 │           HALLELUJAH LOCAL LEADS ABUNDANCE SYSTEM        │
 ├─────────────────────────────────────────────────────────┤
 │                                                          │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  │
-│  │   CHAMBER     │  │    BNI       │  │  MAGAZINE    │  │
-│  │   SCRAPER     │  │   SCRAPER    │  │  SCRAPER     │  │
-│  │  (Playwright) │  │ (Playwright) │  │ (Firecrawl   │  │
-│  │              │  │              │  │  + Haiku AI)  │  │
-│  │  6 platforms  │  │  11 portals  │  │  Vision AI   │  │
-│  └──────┬───────┘  └──────┬───────┘  └──────┬───────┘  │
-│         │                 │                  │          │
-│         └────────────┬────┴──────────────────┘          │
+│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐  │
+│  │ CHAMBER  │  │   BNI    │  │ MAGAZINE │  │ WEBSITE  │  │
+│  │ SCRAPER  │  │ SCRAPER  │  │ SCRAPER  │  │ REDESIGN │  │
+│  │Playwright│  │Playwright│  │Firecrawl │  │Claude+46 │  │
+│  │6 platfrms│  │11 portals│  │Vision AI │  │components│  │
+│  └────┬─────┘  └────┬─────┘  └────┬─────┘  └────┬─────┘  │
+│       │              │             │              │        │
+│       └──────┬───────┴─────────────┴──────────────┘        │
 │                      ▼                                   │
 │  ┌─────────────────────────────────────────────────┐    │
 │  │         WATERFALL ENRICHMENT ENGINE              │    │
@@ -100,7 +100,7 @@ python -X utf8 process_issue.py --edition johnsoncounty --year 2026 --month 3
 
 ---
 
-## The 4 Pillars
+## The 5 Pillars
 
 | Pillar | What It Does | Cost | SKILL.md |
 |--------|-------------|------|----------|
@@ -108,6 +108,7 @@ python -X utf8 process_issue.py --edition johnsoncounty --year 2026 --month 3
 | **BNI** | Scrape chapter members with 92% LinkedIn hit rate | Free | `bni/SKILL.md` |
 | **Magazine** | Detect advertisers via AI vision, enrich owners | ~$0.50/issue | `magazine/SKILL.md` |
 | **Enrichment** | Waterfall: Exa → Tavily → Perplexity | ~$0.15/lead | `enrichment/SKILL.md` |
+| **Website** | Luxury redesign with 46 components + cinematic animations | ~$0.05/site | `website/SKILL.md` |
 
 ---
 
@@ -152,6 +153,7 @@ hallelujah-local-leads-abundance-system/
 ├── bni/                  ← Pillar 2: BNI chapter scraper
 ├── magazine/             ← Pillar 3: Magazine advertiser pipeline
 ├── enrichment/           ← Pillar 4: Waterfall enrichment engine
+├── website/              ← Pillar 5: Website redesign engine (46 components + 6 palettes)
 ├── lib/                  ← Shared utilities (key rotation, checkpoint, etc.)
 ├── samples/              ← Sample output data for reference
 └── docs/                 ← PLATFORM_GUIDE, GOTCHAS, API_BUDGET
@@ -167,6 +169,7 @@ hallelujah-local-leads-abundance-system/
 4. **Run `scrape_directory.py --all`** to scrape all chambers
 5. **Run `scrape_detail_pages.py`** overnight for LinkedIn/social extraction
 6. **Run `enrich_batch.py --tier A,B`** to enrich top prospects
-7. **Export** to CSV or push to your CRM
+7. **Generate redesign** for top prospects: `python website/full_pipeline.py --url "https://prospect.com" --slug prospect --effect cinematic-full`
+8. **Export** to CSV or push to your CRM
 
 Total time: ~30 minutes of setup + 3-4 hours of automated scraping.

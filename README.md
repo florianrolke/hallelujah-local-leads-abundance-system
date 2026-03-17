@@ -10,7 +10,7 @@
 
 Point it at any US city. It finds every local business through 3 trusted sources, enriches each with LinkedIn + email + company intel, and produces a prioritized lead database sorted by industry fit.
 
-### The 4 Pillars
+### The 5 Pillars
 
 | # | Pillar | Source | What You Get |
 |---|--------|--------|-------------|
@@ -18,6 +18,7 @@ Point it at any US city. It finds every local business through 3 trusted sources
 | 2 | **BNI Scraper** | BNI chapter member lists | Name, company, category + 92% LinkedIn hit rate |
 | 3 | **Magazine Scraper** | City Lifestyle magazine ads | Business name, owner, ad frequency, spending signal |
 | 4 | **Enrichment Engine** | Exa, Tavily, Perplexity APIs | LinkedIn, email (SMTP verified), company research |
+| 5 | **Website Redesign** | 46-component luxury design library | Cinematic redesign + live preview URL as lead magnet |
 
 ### Production Numbers
 
@@ -94,6 +95,7 @@ City Name + Industry
 | `bni/SKILL.md` | BNI scraper deep-dive |
 | `magazine/SKILL.md` | Magazine pipeline deep-dive |
 | `enrichment/SKILL.md` | Enrichment engine deep-dive |
+| `website/SKILL.md` | Website redesign engine deep-dive |
 | `docs/PLATFORM_GUIDE.md` | How to identify chamber platforms |
 | `docs/GOTCHAS.md` | 40+ lessons learned the hard way |
 | `docs/API_BUDGET.md` | Cost calculator per pillar |
@@ -105,7 +107,7 @@ City Name + Industry
 
 - Python 3.10+
 - Playwright + Chromium (free)
-- API keys: Exa (free tier), Tavily (free tier), Perplexity (optional), Firecrawl + Anthropic (magazine only)
+- API keys: Exa (free tier), Tavily (free tier), Perplexity (optional), Firecrawl + Anthropic (magazine + website)
 
 ---
 
