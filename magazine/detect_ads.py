@@ -15,6 +15,7 @@ import json
 import re
 import time
 import base64
+import requests
 import anthropic
 from pathlib import Path
 from dotenv import load_dotenv
@@ -23,7 +24,11 @@ load_dotenv()
 
 BLANK_THRESHOLD_BYTES = 55000
 HAIKU_MODEL = "claude-haiku-4-5-20251001"
+OPENROUTER_MODEL = "anthropic/claude-haiku-4-5"
 RATE_LIMIT_DELAY = 1.0  # seconds between API calls
+
+# Auto-detect: None = try Anthropic first, True = use OpenRouter
+_USE_OPENROUTER = None
 
 DETECTION_PROMPT = """Identify all business advertisements on this magazine page.
 
@@ -82,17 +87,90 @@ def parse_ad_response(content: str) -> list:
     return []
 
 
-def detect_ads_single_page(client: anthropic.Anthropic, page_path: Path, page_num: int) -> list:
+def _call_vision_anthropic(api_key: str, image_data: str, media_type: str, prompt_text: str):
+    """Call Anthropic API directly for vision detection."""
+    response = requests.post(
+        "https://api.anthropic.com/v1/messages",
+        headers={"x-api-key": api_key, "anthropic-version": "2023-06-01", "content-type": "application/json"},
+        json={
+            "model": HAIKU_MODEL,
+            "max_tokens": 2000,
+            "messages": [{"role": "user", "content": [
+                {"type": "image", "source": {"type": "base64", "media_type": media_type, "data": image_data}},
+                {"type": "text", "text": prompt_text}
+            ]}]
+        },
+        timeout=30,
+    )
+    if response.status_code == 429:
+        for retry in range(3):
+            wait = (retry + 1) * 10
+            print(f"    [WARN] Claude 429 — retrying in {wait}s (attempt {retry+2}/4)")
+            time.sleep(wait)
+            response = requests.post(
+                "https://api.anthropic.com/v1/messages",
+                headers={"x-api-key": api_key, "anthropic-version": "2023-06-01", "content-type": "application/json"},
+                json={
+                    "model": HAIKU_MODEL,
+                    "max_tokens": 2000,
+                    "messages": [{"role": "user", "content": [
+                        {"type": "image", "source": {"type": "base64", "media_type": media_type, "data": image_data}},
+                        {"type": "text", "text": prompt_text}
+                    ]}]
+                },
+                timeout=30,
+            )
+            if response.status_code != 429:
+                break
+    if not response.ok:
+        return None, response.status_code, response.text[:200]
+    text = response.json().get("content", [{}])[0].get("text", "")
+    return text, 200, None
+
+
+def _call_vision_openrouter(api_key: str, image_data: str, media_type: str, prompt_text: str):
+    """Call OpenRouter API (fallback when Anthropic credits exhausted)."""
+    response = requests.post(
+        "https://openrouter.ai/api/v1/chat/completions",
+        headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+        json={
+            "model": OPENROUTER_MODEL,
+            "max_tokens": 2000,
+            "messages": [{"role": "user", "content": [
+                {"type": "image_url", "image_url": {"url": f"data:{media_type};base64,{image_data}"}},
+                {"type": "text", "text": prompt_text}
+            ]}]
+        },
+        timeout=60,
+    )
+    if not response.ok:
+        return None, response.status_code, response.text[:200]
+    text = response.json().get("choices", [{}])[0].get("message", {}).get("content", "")
+    return text, 200, None
+
+
+def detect_ads_single_page(client, page_path: Path, page_num: int) -> list:
     """Detect ads in a single page image.
 
+    Uses Anthropic API by default, auto-switches to OpenRouter if Anthropic
+    credits are exhausted (400 error with "credit balance" in message).
+
     Args:
-        client: Anthropic client instance
+        client: Unused (kept for backward compat). Uses env vars directly.
         page_path: Path to the cropped page image
         page_num: Page number for metadata
 
     Returns:
         List of ad dicts with page_num and source_image added
     """
+    global _USE_OPENROUTER
+
+    anthropic_key = os.getenv("ANTHROPIC_API_KEY")
+    openrouter_key = os.getenv("OPENROUTER_API_KEY")
+    if not anthropic_key and not openrouter_key:
+        print("  [ERROR] No API key set (ANTHROPIC_API_KEY or OPENROUTER_API_KEY)")
+        return []
+
     # Read and encode image
     with open(page_path, "rb") as f:
         image_data = base64.b64encode(f.read()).decode()
@@ -103,30 +181,31 @@ def detect_ads_single_page(client: anthropic.Anthropic, page_path: Path, page_nu
     media_type = media_type_map.get(suffix, "image/png")
 
     try:
-        response = client.messages.create(
-            model=HAIKU_MODEL,
-            max_tokens=1500,
-            messages=[{
-                "role": "user",
-                "content": [
-                    {
-                        "type": "image",
-                        "source": {
-                            "type": "base64",
-                            "media_type": media_type,
-                            "data": image_data
-                        }
-                    },
-                    {
-                        "type": "text",
-                        "text": DETECTION_PROMPT
-                    }
-                ]
-            }]
-        )
+        text = None
 
-        content = response.content[0].text
-        ads = parse_ad_response(content)
+        # Try Anthropic first, auto-switch to OpenRouter on credit exhaustion
+        if _USE_OPENROUTER is not True and anthropic_key:
+            text, status, err = _call_vision_anthropic(anthropic_key, image_data, media_type, DETECTION_PROMPT)
+            if text is None and status == 400 and "credit balance" in (err or "").lower():
+                print("    [INFO] Anthropic credits exhausted — switching to OpenRouter")
+                _USE_OPENROUTER = True
+            elif text is None:
+                print(f"    [WARN] Claude API error: HTTP {status}")
+                return []
+
+        if _USE_OPENROUTER and openrouter_key:
+            text, status, err = _call_vision_openrouter(openrouter_key, image_data, media_type, DETECTION_PROMPT)
+            if text is None:
+                print(f"    [WARN] OpenRouter API error: HTTP {status}")
+                return []
+        elif _USE_OPENROUTER and not openrouter_key:
+            print("    [ERROR] OpenRouter key not set, cannot fallback")
+            return []
+
+        if not text:
+            return []
+
+        ads = parse_ad_response(text)
 
         # Add metadata to each ad
         for ad in ads:
@@ -135,10 +214,6 @@ def detect_ads_single_page(client: anthropic.Anthropic, page_path: Path, page_nu
 
         return ads
 
-    except anthropic.RateLimitError:
-        print(f"    [WARN] Rate limited on page {page_num}, waiting 30s...")
-        time.sleep(30)
-        return detect_ads_single_page(client, page_path, page_num)
     except Exception as e:
         print(f"    [ERROR] Page {page_num}: {e}")
         return []

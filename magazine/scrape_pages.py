@@ -33,53 +33,58 @@ RATE_LIMIT_DELAY = 2.0
 
 
 def crop_issuu_chrome(image_path: str, output_path: str) -> str:
-    """Remove Issuu UI chrome from screenshot using brightness analysis.
+    """Remove Issuu UI chrome from screenshot using per-row/col brightness analysis.
 
-    Strategy:
-    - Scan rows for dark->bright transition to find content top edge
-    - Bottom = top + 59% of total height (removes bottom controls)
-    - Scan columns to remove dark sidebars
+    Improved strategy (from production Andy pipeline):
+    - Scan rows starting at y=60 for dark→bright transition to find content top
+    - Bottom = top + 59% of total height (removes bottom controls + "Create a flipbook")
+    - Scan columns starting at x=200 for left edge, x=1700 for right edge
+    - Detect spreads (width > height × 1.3) and split into two pages
     """
     from PIL import Image
     import numpy as np
 
     img = Image.open(image_path)
     arr = np.array(img)
+    h, w = arr.shape[:2]
 
-    # Convert to grayscale for brightness analysis
-    if len(arr.shape) == 3:
-        gray = np.mean(arr[:, :, :3], axis=2)
-    else:
-        gray = arr.astype(float)
-
+    # Per-row and per-column mean brightness
+    row_br = arr.mean(axis=(1, 2))
+    col_br = arr.mean(axis=(0, 2))
     dark_thresh = 130
-    height, width = gray.shape
 
-    # Find top edge: first row with average brightness > threshold
-    row_brightness = np.mean(gray, axis=1)
-    top = 0
-    for i in range(len(row_brightness)):
-        if row_brightness[i] > dark_thresh:
-            top = i
+    # Find top edge: scan from row 60 for dark→bright transition
+    top = int(h * 0.10)
+    for y in range(60, h // 2):
+        if row_br[y] < dark_thresh:
+            for y2 in range(y, h // 2):
+                if row_br[y2] > dark_thresh:
+                    top = y2
+                    break
             break
 
-    # Bottom = top + 59% of total height (clips zoom controls, "Create a flipbook")
-    bottom = top + int(height * 0.59)
-    bottom = min(bottom, height)
+    # Bottom = top + 59% of total height
+    bottom = top + int(h * 0.59)
+    bottom = min(bottom, h)
 
-    # Find left edge: first column with brightness > threshold
-    col_brightness = np.mean(gray, axis=0)
-    left = 0
-    for i in range(len(col_brightness)):
-        if col_brightness[i] > dark_thresh:
-            left = i
+    # Find left edge: scan from column 200
+    left = int(w * 0.27)
+    for x in range(200, w // 2):
+        if col_br[x] < dark_thresh:
+            for x2 in range(x, w // 2):
+                if col_br[x2] > dark_thresh:
+                    left = x2
+                    break
             break
 
-    # Find right edge: last column with brightness > threshold
-    right = width
-    for i in range(len(col_brightness) - 1, -1, -1):
-        if col_brightness[i] > dark_thresh:
-            right = i + 1
+    # Find right edge: scan from column 1700 backward
+    right = int(w * 0.73)
+    for x in range(min(1700, w - 1), w // 2, -1):
+        if col_br[x] < dark_thresh:
+            for x2 in range(x, w // 2, -1):
+                if col_br[x2] > dark_thresh:
+                    right = x2 + 1
+                    break
             break
 
     # Sanity check: don't crop to nothing
@@ -88,8 +93,24 @@ def crop_issuu_chrome(image_path: str, output_path: str) -> str:
         return output_path
 
     cropped = img.crop((left, top, right, bottom))
-    cropped.save(output_path)
-    return output_path
+
+    # Spread detection: if content is much wider than tall, split into 2 pages
+    cw, ch = cropped.size
+    if cw > ch * 1.3:
+        mid = cw // 2
+        left_page = cropped.crop((0, 0, mid, ch))
+        right_page = cropped.crop((mid, 0, cw, ch))
+
+        # Save left page as the main output
+        left_page.save(output_path)
+        # Save right page with _b suffix
+        base, ext = os.path.splitext(output_path)
+        right_path = f"{base}_b{ext}"
+        right_page.save(right_path)
+        return output_path  # caller will pick up _b via glob
+    else:
+        cropped.save(output_path)
+        return output_path
 
 
 def screenshot_page_firecrawl(url: str, api_key: str) -> bytes | None:

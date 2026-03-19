@@ -10,7 +10,7 @@
 
 Point it at any US city. It finds every local business through 3 trusted sources, enriches each with LinkedIn + email + company intel, and produces a prioritized lead database sorted by industry fit.
 
-### The 5 Pillars
+### The 6 Pillars
 
 | # | Pillar | Source | What You Get |
 |---|--------|--------|-------------|
@@ -19,6 +19,7 @@ Point it at any US city. It finds every local business through 3 trusted sources
 | 3 | **Magazine Scraper** | City Lifestyle magazine ads | Business name, owner, ad frequency, spending signal |
 | 4 | **Enrichment Engine** | Exa, Tavily, Perplexity APIs | LinkedIn, email (SMTP verified), company research |
 | 5 | **Website Redesign** | 46-component luxury design library | Cinematic redesign + live preview URL as lead magnet |
+| 6 | **Outreach Automation** | Playwright + CapSolver | Auto-fill chamber/website contact forms with CAPTCHA solving |
 
 ### Production Numbers
 
@@ -96,6 +97,7 @@ City Name + Industry
 | `magazine/SKILL.md` | Magazine pipeline deep-dive |
 | `enrichment/SKILL.md` | Enrichment engine deep-dive |
 | `website/SKILL.md` | Website redesign engine deep-dive |
+| `outreach/SKILL.md` | Contact form outreach automation |
 | `docs/PLATFORM_GUIDE.md` | How to identify chamber platforms |
 | `docs/GOTCHAS.md` | 40+ lessons learned the hard way |
 | `docs/API_BUDGET.md` | Cost calculator per pillar |

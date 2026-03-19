@@ -100,13 +100,59 @@ def fuzzy_match(name1: str, name2: str) -> bool:
     return False
 
 
-def build_merge_groups(names: list) -> dict:
+def load_hardcoded_merge_groups(merge_groups_path: str = None) -> list:
+    """Load hardcoded merge groups from a JSON file.
+
+    File format: list of lists, where each inner list contains name variants
+    that should be treated as the same business.
+
+    Example:
+    [
+        ["The Red Door Group", "Red Door"],
+        ["Refresh Medical Spa", "Refresh", "Refresh Spa"],
+        ["Fit Form Pilates", "Fit Form Bootcamp", "Fit Form"]
+    ]
+
+    Returns list of groups (each a list of name strings).
+    """
+    if not merge_groups_path:
+        return []
+    path = Path(merge_groups_path)
+    if not path.exists():
+        return []
+    with open(path, "r", encoding="utf-8") as f:
+        groups = json.load(f)
+    if isinstance(groups, list):
+        return groups
+    return []
+
+
+def build_merge_groups(names: list, hardcoded_groups: list = None) -> dict:
     """Build merge groups for fuzzy-matching business names.
+
+    Combines hardcoded merge groups (from production knowledge — e.g., brand
+    name variations that can't be detected algorithmically) with automatic
+    fuzzy matching.
+
+    Args:
+        names: List of business names from all issues
+        hardcoded_groups: Optional list of lists with name variants
 
     Returns dict mapping each normalized name to its canonical form.
     """
     canonical = {}  # normalized_name -> canonical_name
     groups = []  # list of sets of normalized names
+
+    # Seed with hardcoded groups first
+    if hardcoded_groups:
+        for hg in hardcoded_groups:
+            norm_group = set()
+            for name in hg:
+                norm = normalize_name(name)
+                if norm:
+                    norm_group.add(norm)
+            if norm_group:
+                groups.append(norm_group)
 
     for name in names:
         norm = normalize_name(name)
@@ -171,7 +217,8 @@ def resolve_year_month_pairs(months_str: str, base_year: int) -> list:
     return pairs
 
 
-def rebuild_flagged_reports(edition: str, year_month_pairs: list, data_dir: str = "data"):
+def rebuild_flagged_reports(edition: str, year_month_pairs: list, data_dir: str = "data",
+                            merge_groups_path: str = None, pages_base_dir: str = None):
     """Rebuild all issue reports with NEW/SEEN flags.
 
     Processes issues newest-first. For each issue, advertisers not seen
@@ -181,6 +228,8 @@ def rebuild_flagged_reports(edition: str, year_month_pairs: list, data_dir: str 
         edition: Edition slug
         year_month_pairs: List of (year, month) tuples, newest first
         data_dir: Path to data directory
+        merge_groups_path: Optional path to JSON file with hardcoded merge groups
+        pages_base_dir: Optional base directory for page images (subdir per issue)
     """
     leads_dir = Path("leads")
     if not leads_dir.exists():
@@ -212,8 +261,11 @@ def rebuild_flagged_reports(edition: str, year_month_pairs: list, data_dir: str 
         for ad in issue["data"]:
             all_names.append(ad.get("business_name", ""))
 
-    # Build merge groups for fuzzy matching
-    merge_map = build_merge_groups(all_names)
+    # Build merge groups for fuzzy matching (with optional hardcoded groups)
+    hardcoded = load_hardcoded_merge_groups(merge_groups_path)
+    if hardcoded:
+        print(f"  Loaded {len(hardcoded)} hardcoded merge groups")
+    merge_map = build_merge_groups(all_names, hardcoded)
 
     # Track first appearance (scanning newest to oldest)
     # "first_seen" = the OLDEST issue where the business appears
@@ -278,11 +330,19 @@ def rebuild_flagged_reports(edition: str, year_month_pairs: list, data_dir: str 
         # Sort: NEW first, then SEEN
         sorted_advertisers = new_leads + seen_leads
 
+        # Resolve pages directory for this issue (if provided)
+        issue_pages_dir = None
+        if pages_base_dir:
+            candidate = Path(pages_base_dir) / f"{edition}_{year}_{month:02d}"
+            if candidate.exists():
+                issue_pages_dir = str(candidate)
+
         # Build report
         report_file = leads_dir / f"magazine_report_{edition}_{month_name}_{year}_flagged.html"
         build_html_report(
             sorted_advertisers, report_file, edition_name,
-            month_name, year, flag_data=flag_data
+            month_name, year, flag_data=flag_data,
+            pages_dir=issue_pages_dir
         )
 
         new_count = len(new_leads)
@@ -309,6 +369,10 @@ def main():
     parser.add_argument("--months", default=None,
                         help="Comma-separated months newest-first (e.g., 3,2,1,12,11,10,9,8)")
     parser.add_argument("--data-dir", default="data", help="Data directory with editions.json")
+    parser.add_argument("--merge-groups", default=None,
+                        help="Path to JSON file with hardcoded merge groups (list of lists)")
+    parser.add_argument("--pages-dir", default=None,
+                        help="Base dir for page images (expects subdirs like edition_YYYY_MM/)")
     args = parser.parse_args()
 
     print(f"{'=' * 60}")
@@ -336,7 +400,9 @@ def main():
         return
 
     print(f"  Issues to process: {[(MONTH_NAMES[m].title(), y) for y, m in year_month_pairs]}")
-    rebuild_flagged_reports(args.edition, year_month_pairs, args.data_dir)
+    rebuild_flagged_reports(args.edition, year_month_pairs, args.data_dir,
+                            merge_groups_path=args.merge_groups,
+                            pages_base_dir=args.pages_dir)
 
     print(f"\n{'=' * 60}")
     print(f"  DONE")

@@ -39,8 +39,40 @@ def encode_image_base64(image_path: str) -> str:
         return ""
 
 
+def load_page_images(pages_dir: str) -> dict:
+    """Load and crop page images as base64 for embedding in reports.
+
+    Args:
+        pages_dir: Path to directory containing page_NNN.png files
+
+    Returns:
+        Dict mapping page_num (int) -> base64-encoded PNG string
+    """
+    import io
+    page_images = {}
+    pages_path = Path(pages_dir)
+    if not pages_path.exists():
+        return page_images
+
+    for page_path in sorted(pages_path.glob("page_*.png")):
+        try:
+            page_num = int(page_path.stem.split("_")[1])
+            # Skip very large files (> 2MB) to keep report size manageable
+            if page_path.stat().st_size > 2_000_000:
+                continue
+            data_uri = encode_image_base64(str(page_path))
+            if data_uri:
+                # Strip the data URI prefix to store just base64
+                page_images[page_num] = data_uri
+        except (ValueError, IndexError):
+            continue
+
+    return page_images
+
+
 def build_html_report(advertisers: list, output_path: Path, edition_name: str,
-                      month_name: str, year: int, flag_data: dict = None):
+                      month_name: str, year: int, flag_data: dict = None,
+                      pages_dir: str = None):
     """Build an HTML report for enriched magazine advertisers.
 
     Args:
@@ -50,6 +82,7 @@ def build_html_report(advertisers: list, output_path: Path, edition_name: str,
         month_name: Month name (e.g., "march")
         year: Year
         flag_data: Optional dict with "status" key per business (NEW/SEEN)
+        pages_dir: Optional path to page images directory for embedding page thumbnails
     """
     # Compute stats
     total = len(advertisers)
@@ -59,6 +92,9 @@ def build_html_report(advertisers: list, output_path: Path, edition_name: str,
     websites = sum(1 for a in advertisers if a.get("website"))
 
     flag_data = flag_data or {}
+
+    # Load page images for embedding if pages_dir provided
+    page_images = load_page_images(pages_dir) if pages_dir else {}
 
     # Build cards HTML
     cards_html = []
@@ -89,12 +125,16 @@ def build_html_report(advertisers: list, output_path: Path, edition_name: str,
         elif flag_status == "SEEN":
             badge_html = f'<span class="badge badge-seen">ALREADY IN: {escape(flag_source)}</span>'
 
-        # Image thumbnail
+        # Image thumbnail — prefer source_image (ad crop), fall back to full page image
         img_html = ""
         if source_image:
             data_uri = encode_image_base64(source_image)
             if data_uri:
                 img_html = f'<img src="{data_uri}" class="ad-thumb" alt="Ad from page {page_num}">'
+        if not img_html and page_num != "?" and page_images.get(int(page_num) if str(page_num).isdigit() else 0):
+            page_data_uri = page_images.get(int(page_num))
+            if page_data_uri:
+                img_html = f'<img src="{page_data_uri}" class="ad-thumb" alt="Page {page_num}">'
 
         # Contact details
         contact_parts = []
@@ -248,10 +288,12 @@ if __name__ == "__main__":
     parser.add_argument("--edition", default="Magazine")
     parser.add_argument("--month", default="unknown")
     parser.add_argument("--year", type=int, default=2026)
+    parser.add_argument("--pages-dir", help="Path to page images for embedding in report")
     args = parser.parse_args()
 
     with open(args.input, "r", encoding="utf-8") as f:
         advertisers = json.load(f)
 
-    build_html_report(advertisers, Path(args.output), args.edition, args.month, args.year)
+    build_html_report(advertisers, Path(args.output), args.edition, args.month, args.year,
+                      pages_dir=args.pages_dir)
     print(f"Done: {len(advertisers)} advertisers in report")

@@ -15,5 +15,8 @@ anthropic>=0.18.0         # Claude Haiku vision for ad detection
 Pillow>=10.0.0            # Image processing
 numpy>=1.24.0             # Brightness analysis for Issuu chrome removal
 
+# Outreach pillar
+capsolver>=1.0.0          # CAPTCHA solving (reCAPTCHA, hCaptcha, Turnstile)
+
 # Optional
 tavily-python>=0.3.0      # Tavily search (enrichment fallback)

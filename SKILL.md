@@ -100,7 +100,7 @@ python -X utf8 process_issue.py --edition johnsoncounty --year 2026 --month 3
 
 ---
 
-## The 5 Pillars
+## The 6 Pillars
 
 | Pillar | What It Does | Cost | SKILL.md |
 |--------|-------------|------|----------|
@@ -109,6 +109,7 @@ python -X utf8 process_issue.py --edition johnsoncounty --year 2026 --month 3
 | **Magazine** | Detect advertisers via AI vision, enrich owners | ~$0.50/issue | `magazine/SKILL.md` |
 | **Enrichment** | Waterfall: Exa → Tavily → Perplexity | ~$0.15/lead | `enrichment/SKILL.md` |
 | **Website** | Luxury redesign with 46 components + cinematic animations | ~$0.05/site | `website/SKILL.md` |
+| **Outreach** | Auto-fill contact forms with Playwright + CAPTCHA solving | ~$0.002/form | `outreach/SKILL.md` |
 
 ---
 
@@ -139,6 +140,8 @@ python -X utf8 process_issue.py --edition johnsoncounty --year 2026 --month 3
 | `PERPLEXITY_API_KEY` | Deep research + BNI discovery | Pay-per-query |
 | `FIRECRAWL_API_KEY` | Magazine screenshots | 500 credits/mo |
 | `ANTHROPIC_API_KEY` | Magazine ad detection (Haiku) | Pay-per-token |
+| `OPENROUTER_API_KEY` | Vision fallback when Anthropic exhausted | Pay-per-token |
+| `CAPSOLVER_API_KEY` | Outreach CAPTCHA solving | ~$0.002/solve |
 
 **Minimum viable setup:** Playwright (free) for scraping + 1 Exa key for enrichment.
 
@@ -154,6 +157,7 @@ hallelujah-local-leads-abundance-system/
 ├── magazine/             ← Pillar 3: Magazine advertiser pipeline
 ├── enrichment/           ← Pillar 4: Waterfall enrichment engine
 ├── website/              ← Pillar 5: Website redesign engine (46 components + 6 palettes)
+├── outreach/             ← Pillar 6: Contact form outreach (Playwright + CapSolver)
 ├── lib/                  ← Shared utilities (key rotation, checkpoint, etc.)
 ├── samples/              ← Sample output data for reference
 └── docs/                 ← PLATFORM_GUIDE, GOTCHAS, API_BUDGET
@@ -170,6 +174,7 @@ hallelujah-local-leads-abundance-system/
 5. **Run `scrape_detail_pages.py`** overnight for LinkedIn/social extraction
 6. **Run `enrich_batch.py --tier A,B`** to enrich top prospects
 7. **Generate redesign** for top prospects: `python website/full_pipeline.py --url "https://prospect.com" --slug prospect --effect cinematic-full`
-8. **Export** to CSV or push to your CRM
+8. **Auto-submit outreach** via contact forms: `python outreach/chamber_form_outreach.py --leads chambers/leads/chamber_directory_members.json`
+9. **Export** to CSV or push to your CRM
 
 Total time: ~30 minutes of setup + 3-4 hours of automated scraping.
