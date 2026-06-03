@@ -73,11 +73,8 @@ def deploy_github(slug, html_path, repo=None):
         print(f"  Cloning deploy repo: {repo}")
         os.makedirs(os.path.dirname(deploy_dir), exist_ok=True)
 
-        # Try gh CLI first, then git+token
+        # Use GitHub CLI / configured git credentials. Never put tokens in URLs.
         clone_url = f"https://github.com/{repo}.git"
-        token = os.getenv('GITHUB_TOKEN')
-        if token:
-            clone_url = f"https://{token}@github.com/{repo}.git"
 
         result = subprocess.run(
             ['git', 'clone', '--depth', '1', clone_url, deploy_dir],
